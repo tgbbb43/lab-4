@@ -1,0 +1,58 @@
+name: Lab 4 - Artifacts and Outputs
+
+# מפעיל את התהליך בכל פעם שעושים Push (העלאה) של קוד
+on: [push]
+
+jobs:
+  # יוצרים ג'וב בשם build
+  build:
+    runs-on: ubuntu-latest # המחשב שיריץ את זה הוא מסוג אובונטו
+    
+    # כאן אנחנו מגדירים את ה"פתק" (Output) שהג'וב הזה ירצה לחלוק עם העולם
+    outputs:
+      artifact-name: ${{ steps.set-output-step.outputs.artifact-name }}
+
+    steps:
+      # 1. מעתיקים את הקוד מהגיטאהב לתוך המחשב הווירטואלי
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. "מתקינים ומריצים" את האפליקציה (כאן אנחנו מדמים בנייה ויוצרים תיקיית dist עם קובץ)
+      - name: Install and Build Application
+        run: |
+          mkdir dist
+          echo "Hello from build job!" > dist/app.txt
+
+      # 3. יוצרים את ה-Output (הפתק) ונותנים לצעד הזה ID כדי שנוכל לגשת אליו
+      - name: Define Artifact Name Output
+        id: set-output-step
+        run: echo "artifact-name=build-output" >> $GITHUB_OUTPUT
+
+      # 4. מעלים את תיקיית dist לענן של גיטהאב. לשם של הקובץ אנחנו קוראים בעזרת ה-Output שיצרנו
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.set-output-step.outputs.artifact-name }}
+          path: dist/
+
+     # יוצרים ג'וב שני בשם inspect
+  inspect:
+    runs-on: ubuntu-latest
+    # אומרים למחשב הזה: אל תתחיל לעבוד עד שג'וב build מסיים בהצלחה!
+    needs: build
+
+    steps:
+      # 1. מדפיסים למסך (לוג) את ה-Output שקיבלנו מהג'וב הקודם
+      - name: Print Output from Build Job
+        run: echo "The artifact name is ${{ needs.build.outputs.artifact-name }}"
+
+      # 2. מורידים מהענן את התיקייה שנשמרה בג'וב הקודם, תוך שימוש באותו השם מהפתק
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      # 3. מריצים פקודה שמראה ומדפיסה את כל הקבצים שיש בתוך תיקיית dist כדי לוודא שהם הגיעו
+      - name: Display downloaded files
+        run: ls -R dist/
